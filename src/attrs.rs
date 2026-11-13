@@ -223,6 +223,56 @@ impl Hash for LetterSpacing {
     }
 }
 
+/// The optical size, in points, set on the `opsz` axis of a variable font
+/// that has one.
+///
+/// Fonts such as SF Pro, Segoe UI Variable and Inter change their design
+/// with this axis: wider and sturdier at text sizes, finer at display sizes.
+/// Set it to the text's font size for the behaviour of CSS
+/// `font-optical-sizing: auto`, Core Text and DirectWrite. A font without the
+/// axis ignores it.
+#[derive(Clone, Copy, Debug)]
+pub struct OpticalSize(pub f32);
+
+impl OpticalSize {
+    /// The value's bits, with -0.0 as +0.0 and every NaN as one NaN, so that
+    /// equal sizes compare and hash equal.
+    fn canonical_bits(self) -> u32 {
+        const CANONICAL_NAN_BITS: u32 = 0x7fc0_0000;
+        if self.0.is_nan() {
+            CANONICAL_NAN_BITS
+        } else {
+            (self.0 + 0.0).to_bits()
+        }
+    }
+}
+
+impl PartialEq for OpticalSize {
+    fn eq(&self, other: &Self) -> bool {
+        self.canonical_bits() == other.canonical_bits()
+    }
+}
+
+impl Eq for OpticalSize {}
+
+impl Hash for OpticalSize {
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.canonical_bits().hash(hasher);
+    }
+}
+
+impl PartialOrd for OpticalSize {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for OpticalSize {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        f32::from_bits(self.canonical_bits()).total_cmp(&f32::from_bits(other.canonical_bits()))
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum UnderlineStyle {
     #[default]
@@ -297,6 +347,9 @@ pub struct Attrs<'a> {
     pub letter_spacing_opt: Option<LetterSpacing>,
     pub font_features: FontFeatures,
     pub text_decoration: TextDecoration,
+    /// The optical size set on fonts with an `opsz` axis; `None` leaves the
+    /// font's default
+    pub optical_size_opt: Option<OpticalSize>,
 }
 
 impl<'a> Attrs<'a> {
@@ -316,6 +369,7 @@ impl<'a> Attrs<'a> {
             letter_spacing_opt: None,
             font_features: FontFeatures::new(),
             text_decoration: TextDecoration::new(),
+            optical_size_opt: None,
         }
     }
 
@@ -379,6 +433,13 @@ impl<'a> Attrs<'a> {
         self
     }
 
+    /// Set the [`OpticalSize`] in points: pass the font size for automatic
+    /// optical sizing
+    pub const fn optical_size(mut self, optical_size: f32) -> Self {
+        self.optical_size_opt = Some(OpticalSize(optical_size));
+        self
+    }
+
     pub const fn underline(mut self, style: UnderlineStyle) -> Self {
         self.text_decoration.underline = style;
         self
@@ -415,6 +476,7 @@ impl<'a> Attrs<'a> {
             && self.stretch == other.stretch
             && self.style == other.style
             && self.weight == other.weight
+            && self.optical_size_opt == other.optical_size_opt
     }
 }
 
@@ -454,6 +516,7 @@ pub struct AttrsOwned {
     pub letter_spacing_opt: Option<LetterSpacing>,
     pub font_features: FontFeatures,
     pub text_decoration: TextDecoration,
+    pub optical_size_opt: Option<OpticalSize>,
 }
 
 impl AttrsOwned {
@@ -470,6 +533,7 @@ impl AttrsOwned {
             letter_spacing_opt: attrs.letter_spacing_opt,
             font_features: attrs.font_features.clone(),
             text_decoration: attrs.text_decoration,
+            optical_size_opt: attrs.optical_size_opt,
         }
     }
 
@@ -486,6 +550,7 @@ impl AttrsOwned {
             letter_spacing_opt: self.letter_spacing_opt,
             font_features: self.font_features.clone(),
             text_decoration: self.text_decoration,
+            optical_size_opt: self.optical_size_opt,
         }
     }
 }

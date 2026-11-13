@@ -231,6 +231,7 @@ fn shape_fallback(
             font_monospace_em_width: font.monospace_em_width(),
             font_id: font.id(),
             font_weight: attrs.weight,
+            font_optical_size: attrs.optical_size_opt,
             glyph_id: info.glyph_id.try_into().expect("failed to cast glyph ID"),
             //TODO: color should not be related to shaping
             color_opt: attrs.color_opt,
@@ -311,7 +312,8 @@ fn shape_run(
         &scripts,
         &line[start_run..end_run],
         attrs.weight,
-    );
+    )
+    .optical_size(attrs.optical_size_opt);
 
     let font = font_iter.next().expect("no default font found");
 
@@ -493,7 +495,8 @@ fn shape_skip(
         &[],
         "",
         attrs.weight,
-    );
+    )
+    .optical_size(attrs.optical_size_opt);
 
     let font = font_iter.next().expect("no default font found");
     let glyph_start = glyphs.len();
@@ -522,7 +525,8 @@ fn shape_skip(
         let fb_fonts = font_system.get_font_matches(&fb_attrs);
         let fb_families = [&fb_family];
         let mut fb_iter =
-            FontFallbackIter::new(font_system, &fb_fonts, &fb_families, &[], "", attrs.weight);
+            FontFallbackIter::new(font_system, &fb_fonts, &fb_families, &[], "", attrs.weight)
+                .optical_size(attrs.optical_size_opt);
 
         if let Some(fb_font) = fb_iter.next() {
             let fb_swash = fb_font.as_swash();
@@ -603,6 +607,7 @@ fn shape_skip_glyphs(
                     font_monospace_em_width,
                     font_id,
                     font_weight: attrs.weight,
+                    font_optical_size: attrs.optical_size_opt,
                     glyph_id,
                     color_opt: attrs.color_opt,
                     metadata: attrs.metadata,
@@ -639,6 +644,7 @@ pub struct ShapeGlyph {
     pub font_monospace_em_width: Option<f32>,
     pub font_id: fontdb::ID,
     pub font_weight: fontdb::Weight,
+    pub font_optical_size: Option<crate::OpticalSize>,
     pub glyph_id: u16,
     pub color_opt: Option<Color>,
     pub metadata: usize,
@@ -663,6 +669,7 @@ impl ShapeGlyph {
             line_height_opt,
             font_id: self.font_id,
             font_weight: self.font_weight,
+            font_optical_size: self.font_optical_size,
             glyph_id: self.glyph_id,
             x,
             y,
@@ -989,7 +996,8 @@ impl ShapeSpan {
                             &[],
                             &probe_text,
                             attrs.weight,
-                        );
+                        )
+                        .optical_size(attrs.optical_size_opt);
 
                         if let Some(font) = font_iter.next() {
                             let mut glyphs = Vec::new();
@@ -1118,7 +1126,7 @@ impl ShapeSpan {
                 .next()
                 .and_then(|glyph| {
                     font_system
-                        .get_font(glyph.font_id, glyph.font_weight)
+                        .get_font_sized(glyph.font_id, glyph.font_weight, glyph.font_optical_size)
                         .map(|font| decoration_metrics(&font))
                 });
 
