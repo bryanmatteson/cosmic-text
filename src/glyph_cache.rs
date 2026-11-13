@@ -29,6 +29,8 @@ pub struct CacheKey {
     pub y_bin: SubpixelBin,
     /// Font weight
     pub font_weight: fontdb::Weight,
+    /// Optical size, for fonts with an `opsz` axis
+    pub font_optical_size: Option<crate::OpticalSize>,
     /// [`CacheKeyFlags`]
     pub flags: CacheKeyFlags,
 }
@@ -53,6 +55,7 @@ impl CacheKey {
                 y_bin,
                 flags,
                 font_weight: weight,
+                font_optical_size: None,
             },
             x,
             y,

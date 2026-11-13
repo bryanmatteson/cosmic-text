@@ -123,6 +123,17 @@ impl Font {
 
 impl Font {
     pub fn new(db: &fontdb::Database, id: fontdb::ID, weight: fontdb::Weight) -> Option<Self> {
+        Self::new_sized(db, id, weight, None)
+    }
+
+    /// Load a font at a weight and, when it has an `opsz` axis and
+    /// `optical_size` is set, at that optical size.
+    pub fn new_sized(
+        db: &fontdb::Database,
+        id: fontdb::ID,
+        weight: fontdb::Weight,
+        optical_size: Option<crate::OpticalSize>,
+    ) -> Option<Self> {
         let info = db.face(id)?;
 
         let data = match &info.source {
@@ -141,9 +152,11 @@ impl Font {
         // `ShaperData`, and once to create the persistent `FontRef` tied to the
         // lifetime of the face data.
         let font_ref = FontRef::from_index((*data).as_ref(), info.index).ok()?;
-        let location = font_ref
-            .axes()
-            .location([(Tag::new(b"wght"), weight.0 as f32)]);
+        let mut settings = alloc::vec![(Tag::new(b"wght"), weight.0 as f32)];
+        if let Some(optical_size) = optical_size.filter(|size| size.0.is_finite()) {
+            settings.push((Tag::new(b"opsz"), optical_size.0));
+        }
+        let location = font_ref.axes().location(settings);
         let metrics = font_ref.metrics(Size::unscaled(), &location);
 
         let monospace_fallback = if cfg!(feature = "monospace_fallback") {

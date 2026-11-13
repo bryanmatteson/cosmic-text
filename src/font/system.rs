@@ -137,7 +137,8 @@ pub struct FontSystem {
     db: fontdb::Database,
 
     /// Cache for loaded fonts from the database.
-    font_cache: HashMap<(fontdb::ID, fontdb::Weight), Option<Arc<Font>>>,
+    font_cache:
+        HashMap<(fontdb::ID, fontdb::Weight, Option<crate::OpticalSize>), Option<Arc<Font>>>,
 
     /// Sorted unique ID's of all Monospace fonts in DB
     monospace_font_ids: HashSet<fontdb::ID>,
@@ -377,14 +378,25 @@ impl FontSystem {
 
     /// Get a font by its ID and weight.
     pub fn get_font(&mut self, id: fontdb::ID, weight: fontdb::Weight) -> Option<Arc<Font>> {
+        self.get_font_sized(id, weight, None)
+    }
+
+    /// Get a font by its ID, weight and optical size. The optical size is
+    /// set on the font's `opsz` axis when it has one.
+    pub fn get_font_sized(
+        &mut self,
+        id: fontdb::ID,
+        weight: fontdb::Weight,
+        optical_size: Option<crate::OpticalSize>,
+    ) -> Option<Arc<Font>> {
         self.font_cache
-            .entry((id, weight))
+            .entry((id, weight, optical_size))
             .or_insert_with(|| {
                 #[cfg(feature = "std")]
                 unsafe {
                     self.db.make_shared_face_data(id);
                 }
-                if let Some(font) = Font::new(&self.db, id, weight) {
+                if let Some(font) = Font::new_sized(&self.db, id, weight, optical_size) {
                     Some(Arc::new(font))
                 } else {
                     log::warn!(
